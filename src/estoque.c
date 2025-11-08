@@ -4,6 +4,32 @@
 #include "utils.h"
 #include "estoque.h"
 
+#define TAMANHOBLOCO 10
+
+FILE* abrirArquivoEstoque(int modo){
+    //1:estoque-ab	2:estoque-rb    3:estoque-rb+
+    FILE* arquivo=NULL;
+    switch(modo){
+        case 1:
+            arquivo=fopen("estoque.bin", "ab");
+            break;
+        case 2:
+            arquivo=fopen("estoque.bin", "rb");
+            break;
+        case 3:
+            arquivo=fopen("estoque.bin", "rb+");
+            break;
+        default:
+            printf("Modo inválido.");
+    }
+    
+    if(arquivo==NULL){
+        printf("Erro ao abrir o arquivo.\n");
+    }
+    
+    return arquivo;
+}
+
 int atualizarEstoque(char nomeProduto[], int quantidadeAlterar, int modo) {
     // modo = 1 -> venda (subtrai)
     // modo = 2 -> reposição (soma)
@@ -131,85 +157,98 @@ int atualizarEstoque(char nomeProduto[], int quantidadeAlterar, int modo) {
 }
 
 //CADASTRO DE PRODUTOS----------------------------------------------------------------------------------------------
-void cadastrarProduto(){
-    char nome[31];
-    float preco;
-    int quantidade, codigo;
-    char tipo;
-
-    printf("\n-------Cadastro de Produtos-------\n");
-    printf("Digite o código do produto (até 6 números): ");
-    scanf("%d", &codigo);
-    getchar();
-    printf("Digite o tipo de produto ('C' para comidas, 'B' para bebidas): ");
-    scanf("%c", &tipo);
-    getchar();
-    printf("Digite o nome do produto: ");
-    scanf(" %30[^\n]", nome);
-    printf("Digite o preço do produto: ");
-    scanf("%f", &preco);
-    printf("Digite a quantidade do produto: ");
-    scanf("%d", &quantidade);
-
-    // Verifica se o produto já existe no arquivo
-    FILE *arquivo = fopen("estoque.txt", "r");
-    if (arquivo != NULL) {
-        int codigoLido, qtdLida;
-        char tipoLido, nomeLido[31];
-        float precoLido;
-        while (fscanf(arquivo, "%d %c %30s %f %d", &codigoLido, &tipoLido, nomeLido, &precoLido, &qtdLida) != EOF) {
-            if (strcmp(nomeLido, nome) == 0) {
+int verificarProduto(int codigo){
+    FILE* arquivo=abrirArquivoEstoque(2);
+    if(arquivo==NULL){
+        return 0;
+    }
+    
+    Produto blocoProdutos[TAMANHOBLOCO];
+    int produtosLidos;
+    
+    while((produtosLidos=fread(blocoProdutos, sizeof(Produto), TAMANHOBLOCO, arquivo))>0){
+        for(int i=0; i<produtosLidos; i++){
+            if(blocoProdutos[i].codigo==codigo){
                 fclose(arquivo);
-                printf("\nProduto '%s' ja existe. Atualizando quantidade...\n", nome);
-                atualizarEstoque(nome, quantidade, 2); // modo 2 = reposição
-                return;
+                return 1; //1=verdadeiro, produto existe
             }
         }
-        fclose(arquivo);
     }
-
-    // Se não existe, adiciona novo produto
-    arquivo = fopen("estoque.txt", "a");
-    if (arquivo == NULL) {
-        printf("Erro ao abrir o arquivo estoque.txt\n");
-        return;
-    }
-
-    fprintf(arquivo, "%d %c %s %.2f %d\n", codigo, tipo, nome, preco, quantidade);
     fclose(arquivo);
-    printf("Produto '%s' cadastrado com sucesso!\n", nome);
+    return 0; //0=falso, produto não existe
 }
 
-void menuAlterarProduto(char *nome, float *preco, char *tipo, int *quantidade) {
+void cadastrarProduto(){
+    Produto produto;
+    FILE *arquivo=abrirArquivoEstoque(1); //case 1: ("estoque", "ab")
+    if(arquivo==NULL){
+        return;
+    }
+    
+    printf("\n-------Cadastro de Produtos-------\n");
+    printf("Digite o código do produto: ");
+    scanf("%d", &produto.codigo);
+    
+    if(verificarProduto(produto.codigo)){
+        printf("Já existe um produto com o código %d no estoque\n", produto.codigo);
+        printf("Cadastro cancelado\n");
+        return;
+    }
+    
+    printf("Digite o tipo de produto, 'C' para comidas e 'B' para bebidas: ");
+    scanf(" %c", &produto.tipo);
+    printf("Digite o nome do produto: ");
+    scanf(" %[^\n]", produto.nomeProduto);
+    printf("Digite o preço do produto: ");
+    scanf("%f", &produto.preco);
+    printf("Digite a quantidade do produto no estoque: ");
+    scanf("%d", &produto.quantidade);
+    
+    produto.status=1; //Se o produto acabou de ser cadastrado, ele está ativo
+    
+    fwrite(&produto, sizeof(Produto), 1, arquivo);
+    
+    fclose(arquivo);
+    
+    printf("\nProduto cadastrado com sucesso!\n");
+}
+
+void menuAlterarProduto(Produto *produto){
     int opcao=0;
     do{
-        printf("\n\n--- Produto Encontrado ---\n");
-        printf("Tipo: %c\n", *tipo);
-        printf("Nome: %s\n", nome);
-        printf("Preço: R$%.2f\n", *preco);
-        printf("Quantidade: %d\n", *quantidade);
-        printf("--------------------------\n");
-        printf("O que deseja alterar?\n");
-        printf("1. Nome\n2. Preço\n3. Tipo de produto\n4. Quantidade no estoque\n0. Salvar alterações e Voltar ao menu\n");
+        printf("\n\n-------------Produto Encontrado-------------\n");
+        printf("Código: %d\n", produto->codigo);
+        printf("Tipo: %c\n", produto->tipo);
+        printf("Nome: %s\n", produto->nomeProduto);
+        printf("Preço: R$%.2f\n", produto->preco);
+        printf("Quantidade: %d\n", produto->quantidade);
+        printf("Status: %d\n", produto->status);
+        printf("----------------------------------------------------\n");
+        printf("Digite o número que deseja alterar.\n");
+        printf("(1) Tipo\n(2) Nome\n(3) Preço\n(4)Quantidade\n(5) Status\n(0) Salvar alterações e Voltar ao menu\n");
         printf("Opção: ");
         scanf("%d", &opcao);
 
         switch(opcao){
             case 1:
-                printf("Digite o novo nome: ");
-                scanf(" %30[^\n]", nome); 
+                printf("Digite o novo tipo de produto: ");
+                scanf(" %c", &produto->tipo);
                 break;
             case 2:
-                printf("Digite o novo preço: ");
-                scanf(" %f", preco); 
+                printf("Digite o novo nome: ");
+                scanf(" %[^\n]", produto->nomeProduto); 
                 break;
             case 3:
-                printf("Digite o novo tipo de produto: ");
-                scanf(" %c", tipo);
+                printf("Digite o novo preço: ");
+                scanf(" %f", &produto->preco); 
                 break;
             case 4:
                 printf("Digite a nova quantidade do produto: ");
-                scanf(" %d", quantidade);
+                scanf(" %d", &produto->quantidade);
+                break;
+            case 5:
+                printf("Digite o novo status do produto (1-Ativo, 0-inativo):");
+                scanf(" %d", &produto->status);
                 break;
             case 0:
                 printf("Alterações salvas.\n");
@@ -223,49 +262,42 @@ void menuAlterarProduto(char *nome, float *preco, char *tipo, int *quantidade) {
 
 void alterarProduto(){
     int codigoAlterar;
-    int encontrado = 0;
+    int encontrado=0;
     
-    int codigo;
-    char tipo;
-    char nome[50];
-    float preco;
-    int quantidade;
+    Produto blocoProdutos[TAMANHOBLOCO];//número de produtos que serão lidos de uma vez
+    int produtosLidos;
 
-    FILE *arquivo=fopen("estoque.txt", "r");
-    FILE *temp=fopen("temp.txt", "w");
-    //Verifica se os arquivos podem ser abertos.
-    if((arquivo==NULL)||(temp==NULL)){
-        printf("Erro: não é possível abrir o arquivo\n");
+    FILE* arquivo=abrirArquivoEstoque(3); //case 4: ("estoque", "rb+")
+    if(arquivo==NULL){
         return;
     }
     
-    printf("\n\n-------Alterar Produto-------\n");
+    printf("\n-------------------Alterar Produto-------------------\n");
     printf("Digite o código do produto que deseja alterar: ");
     scanf("%d", &codigoAlterar);
     
-    //Percorre o arquivo de texto buscando pelo produto que possui o código
-    while(fscanf(arquivo, "%d %c %49s %f %d", &codigo, &tipo, nome, &preco, &quantidade)!=EOF){
-        if(codigo==codigoAlterar){
-            encontrado=1;
-            //Chama a função menuAlterarProduto para alterar o arquivo
-            menuAlterarProduto(nome, &preco, &tipo, &quantidade);
+    //Lê o arquivo em blocos de 'TAMANHOBLOCO'
+    //'produtosLidos' armazena quantos produtos foram realmente lidos
+    //Para quando 'fread' retorna 0 (fim do arquivo)
+    while((produtosLidos=fread(blocoProdutos, sizeof(Produto),TAMANHOBLOCO, arquivo))>0){
+        for(int i=0; i<produtosLidos; i++){
+            //Procura o produto com o código desejado
+            if(blocoProdutos[i].codigo==codigoAlterar){
+                encontrado=1;
+                //Chama o menu de alteração, passando o endereço do produto em buffer
+                menuAlterarProduto(&blocoProdutos[i]);
+                long int deslocamento=-((long)produtosLidos*sizeof(Produto));
+                fseek(arquivo, deslocamento, SEEK_CUR);
+                fwrite(blocoProdutos, sizeof(Produto), produtosLidos, arquivo);
+                fclose(arquivo);
+                return;
+            }
         }
-        // Escreve a linha no arquivo temporário.
-        fprintf(temp, "%d %c %s %.2f %d\n", codigo, tipo, nome, preco, quantidade);
     }
-
-    fclose(arquivo);
-    fclose(temp);
     
-    if(encontrado){
-        //Se o produto foi encontrado, apaga 'estoque.txt', e renomeia 'temp.txt' para ser o novo 'estoque.txt'
-        remove("estoque.txt");
-        rename("temp.txt", "estoque.txt");
-        printf("\nProduto alterado com sucesso!\n");
-    }else{
-        //Se não foi encontrado o produto, apenas apaga o arquivo temporário que foi criado.
-        remove("temp.txt");
-        printf("\nProduto com código %d não encontrado.\n", codigoAlterar);
+    fclose(arquivo);
+    if(encontrado==0){
+        printf("\nProduto com o código %d não encontrado\n", codigoAlterar);
     }
 }
 
@@ -273,60 +305,68 @@ void excluirProduto(){
     int codigoExcluir;
     int encontrado=0;
     
-    int codigo;
-    char tipo;
-    char nome[50];
-    float preco;
-    int quantidade;
+    Produto blocoProdutos[TAMANHOBLOCO];//número de produtos que serão lidos de uma vez
+    int produtosLidos;
     
-    FILE *arquivo=fopen("estoque.txt", "r");
-    FILE *temp=fopen("temp.txt", "w");
-
-    if ((arquivo==NULL)||(temp==NULL)) {
-        printf("Erro: nao foi possivel abrir os arquivos.\n");
+    FILE* arquivo=abrirArquivoEstoque(3); //case 3: ("estoque.bin", "rb+")
+    if(arquivo==NULL){
         return;
     }
     
-    printf("\n-----------------Excluir Produto-----------------\n");
-    printf("Digite o código do produto que deseja excluir: ");
+    printf("\n-------------------Excluir Produto-------------------\n");
+    printf("Digite o código do produto que deseja inativar: ");
     scanf("%d", &codigoExcluir);
     
-    while(fscanf(arquivo, "%d %c %49s %f %d", &codigo, &tipo, nome, &preco, &quantidade) != EOF) {
-        if(codigo==codigoExcluir){
-            encontrado = 1;
-            printf("Produto '%s', código: %d, foi excluído.\n", nome, codigo);
-        } else{
-            fprintf(temp, "%d %c %s %.2f %d\n", codigo, tipo, nome, preco, quantidade);
+    while((produtosLidos=fread(blocoProdutos, sizeof(Produto),TAMANHOBLOCO, arquivo))>0){
+        for(int i=0; i<produtosLidos; i++){
+            //Procura o produto com o código desejado
+            if(blocoProdutos[i].codigo==codigoExcluir){
+                if(blocoProdutos[i].codigo==0){
+                    printf("O produto já está inativado\n");
+                    fclose(arquivo);
+                    return;
+                }
+                
+                encontrado=1;
+                blocoProdutos[i].status=0;
+                //Calcula o deslocamento do cursor dentro do arquivo
+                long int deslocamento=-((long)produtosLidos*sizeof(Produto));
+                fseek(arquivo, deslocamento, SEEK_CUR);
+                fwrite(blocoProdutos, sizeof(Produto), produtosLidos, arquivo);
+                fclose(arquivo);
+                return;
+            }
         }
     }
-
+    
     fclose(arquivo);
-    fclose(temp);
-
-    if(encontrado){
-        remove("estoque.txt");
-        rename("temp.txt", "estoque.txt");
-    } else{
-        remove("temp.txt");
-        printf("\nProduto com código %d não encontrado.\n", codigoExcluir);
+    
+    if(encontrado==0){
+        printf("Produto %d não encontrado\n", codigoExcluir);
+    } else if(encontrado==1){
+        printf("Produto %d inativado com sucesso\n", codigoExcluir);
     }
 }
 
 void menuCadastroProduto(){
-    int resposta=-1;
-    void (*gerenciar[])()={menuInicial, cadastrarProduto, alterarProduto, excluirProduto};
+    int opcao=-1;//Alteração do nome resposta para opcao
+    void (*gerenciar[])()={cadastrarProduto, alterarProduto, excluirProduto};
     //Repete a pergunta e cadastra produtos no estoque e 
     //volta para o menu inicial quando o usuário digita 0
-    while (resposta!=0) {
+    while (opcao!=0) {
         printf("\n\n-------Menu de Cadastro-------\n");
-        printf("Digite 1 para cadastrar um produto\n");
-        printf("Digite 2 para alterar o produto\n");
-        printf("Digite 3 para excluir um produto no estoque\n");
-        printf("Digite 0 para voltar ao menu inicial\n");
-        printf("Resposta: ");
-        scanf("%d", &resposta);
-        if(resposta>=0 && resposta<=3){
-            gerenciar[resposta]();
+        printf("(1) Cadastrar um produto\n");
+        printf("(2) Alterar o produto\n");
+        printf("(3) Inativar o produto\n");
+        printf("(0) Voltar ao menu inicial\n");
+        printf("Opção: ");
+        scanf("%d", &opcao);
+        if(opcao==0){ //Corrigido o problema de pilha que pode ocorrer colocando menuInicial dentro do array
+            printf("Retornando ao menu inicial\n");
+            break;
+        }
+        if((opcao<=3)&&(opcao>0)){
+            gerenciar[opcao-1]();
         } else{
             printf("Resposta inválida\n");
         }
@@ -484,3 +524,4 @@ int obterPrecoQuantidadePorCodigo(int codigoBusca, float *precoUnitario, int *qu
     fclose(arquivo);
     return 0;
 }
+
