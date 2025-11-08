@@ -375,95 +375,82 @@ void menuCadastroProduto(){
 
 //CONSULTA DE PRODUTOS (LISTA)---------------------------------------------------------------------------------------------------
 //listar todos os itens do estoque
-void listarTodos()
-{
+void listarTodos(){
     FILE* arquivo;
-    int codigo, quantidade;
-    char tipo;
-    float preco;
-    char nome[31];
-    arquivo = fopen ("estoque.txt", "r");
+    Produto produto;
+    arquivo = fopen ("estoque.bin", "rb");
     if (arquivo == NULL)
     {
         perror("Erro ao abrir o arquivo!"); //mensagem de erro caso o arquivo não exista
     }else {
-        while (fscanf(arquivo, "%d %c %s %f %d", &codigo, &tipo, nome, &preco, &quantidade) != EOF) {
-            printf("%d %c %s %.2f %d\n", codigo, tipo, nome, preco, quantidade);
+        while (fread(&produto, sizeof(Produto), 1, arquivo)==1) {
+            if(produto.status==1){
+                printf("%d %c %s R$%.2f %d(unidades)\n", produto.codigo, produto.tipo, produto.nomeProduto, produto.preco, produto.quantidade);
+            }
         }
     }
-
     fclose(arquivo);
 }
 
 //listar apenas as bebidas do estoque
 void listarBebidas(){
     FILE* arquivo;
-    int codigo, quantidade;
-    char tipo;
-    float preco;
-    char nome[31];
-    arquivo = fopen ("estoque.txt", "r");
+    Produto produto;
+    arquivo = fopen ("estoque.bin", "rb");
     if (arquivo == NULL) {
         perror("Erro ao abrir o arquivo!"); //mensagem de erro caso o arquivo não exista
     } else {
-        while (fscanf(arquivo, "%d %c %30s %f %d", &codigo, &tipo, nome, &preco, &quantidade) != EOF) {
-            if(tipo == 'B' || tipo == 'b') {
-                printf("%d %s %.2f %d\n", codigo, nome, preco, quantidade);
+       while (fread(&produto, sizeof(Produto), 1, arquivo)==1) {
+            if(produto.status==1 && produto.tipo=='B'){
+                printf("%d %c %s R$%.2f %d(unidades)\n", produto.codigo, produto.tipo, produto.nomeProduto, produto.preco, produto.quantidade);
             }
         }
     }
-
     fclose(arquivo);
 }
 
 //listar todas as comidas do estoque
 void listarComidas(){
     FILE* arquivo;
-    int codigo, quantidade;
-    char tipo;
-    float preco;
-    char nome[31];
-    arquivo = fopen ("estoque.txt", "r");
+    Produto produto;
+    arquivo = fopen ("estoque.bin", "rb");
     if (arquivo == NULL) {
         perror("Erro ao abrir o arquivo!"); //mensagem de erro caso o arquivo não exista
     } else {
-        while (fscanf(arquivo, "%d %c %30s %f %d", &codigo, &tipo, nome, &preco, &quantidade) != EOF) {
-            if(tipo == 'C' || tipo == 'c') {
-                printf("%d %s %.2f %d\n", codigo, nome, preco, quantidade);
+       while (fread(&produto, sizeof(Produto), 1, arquivo)==1) {
+            if(produto.status==1 && produto.tipo=='C'){
+                printf("%d %c %s R$%.2f %d(unidades)\n", produto.codigo, produto.tipo, produto.nomeProduto, produto.preco, produto.quantidade);
             }
         }
     }
-
     fclose(arquivo);
 }
 
 void consultarProdutoPorCodigo(){
     FILE* arquivo;
-    int codigo, quantidade, procuraCodigo, encontrado = 0;
-    char tipo;
-    float preco;
-    char nome[31];
+    int procuraCodigo;
+    Produto produto;
     printf("\nDigite o código do produto: ");
     scanf("%d",&procuraCodigo);
-    arquivo = fopen ("estoque.txt", "r");
+    arquivo = fopen ("estoque.bin", "rb");
     if (arquivo == NULL) {
         perror("Erro ao abrir o arquivo!"); //mensagem de erro caso o arquivo não exista
     } else {
-        while (fscanf(arquivo, "%d %c %30s %f %d", &codigo, &tipo, nome, &preco, &quantidade) != EOF) {
-            if(procuraCodigo == codigo) {
-                printf("%d %c %s R$%.2f %d(unidades)\n", codigo, tipo, nome, preco, quantidade);
-                encontrado = 1;
+        while (fread(&produto, sizeof(Produto), 1, arquivo)==1) {
+            if(procuraCodigo==produto.codigo && produto.status==1) {
+                printf("%d %c %s R$%.2f %d(unidades)\n", produto.codigo, produto.tipo, produto.nomeProduto, produto.preco, produto.quantidade);
                 break;
-            }
-            if (!encontrado){
-                printf("Código não encontrado!\n");
+            }else
+            if(procuraCodigo==produto.codigo && produto.status==0){
+                printf("Produto inativo!");
+            }else
+            if(procuraCodigo!=produto.codigo){
+                printf("Produto não encontrado!");
             }
         }
     }
-
-    fclose(arquivo);
-
 }
+
 
 //função para usuário escolher qual lista quer consultar
 void menuConsultarProdutos() {
@@ -480,6 +467,8 @@ void menuConsultarProdutos() {
         printf("Resposta inválida\n");
     }
 }
+
+//*********************************************************************************************************************************************************
 
 int obterPrecoQuantidade(const char nomeProduto[], float *precoUnitario, int *quantidadeDisponivel) {
     FILE *arquivo = fopen("estoque.txt", "r");
@@ -524,4 +513,5 @@ int obterPrecoQuantidadePorCodigo(int codigoBusca, float *precoUnitario, int *qu
     fclose(arquivo);
     return 0;
 }
+
 
