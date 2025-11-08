@@ -1,6 +1,15 @@
 #ifndef ESTOQUE_H
 #define ESTOQUE_H
 
+typedef struct{
+    int codigo;
+    char tipo;
+    char nome[20];
+    float preco;
+    int quantidade;
+    int status;//1-Ativo e 0- inativo
+}Produtos;
+
 void menuCadastroProduto();
 void menuConsultarProdutos();
 
@@ -13,6 +22,7 @@ int obterPrecoQuantidade(const char nomeProduto[], float *precoUnitario, int *qu
 int obterPrecoQuantidadePorCodigo(int codigoBusca, float *precoUnitario, int *quantidadeDisponivel, char *nomeProduto);
 
 #endif
+
 
 
 
